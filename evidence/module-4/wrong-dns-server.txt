@@ -1,0 +1,30 @@
+Module 4 — Failure Demonstration: Wrong DNS Server
+
+Test command:
+dig @8.8.8.8 app.cnproject.test
+
+Observed result:
+
+status: NXDOMAIN
+ANSWER: 0
+SERVER: 8.8.8.8#53(8.8.8.8)
+
+Diagnosis:
+
+The client queried the public DNS server instead of the project's
+private DNS server.
+
+The public DNS server does not contain the private
+app.cnproject.test record, so the hostname could not be resolved.
+
+Correct project DNS server:
+10.7.29.220
+
+Correct resolution:
+app.cnproject.test → 10.7.29.220
+
+Layer affected:
+DNS / Application layer
+
+Recovery:
+Use the configured private DNS server 10.7.29.220 for the project domain.

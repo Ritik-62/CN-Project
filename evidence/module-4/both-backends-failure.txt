@@ -1,0 +1,37 @@
+Module 4 — Failure Demonstration: Both Backends Stopped
+
+Failure injection:
+
+Backend A was stopped.
+Backend B was stopped.
+
+HTTPS test:
+
+curl -i --max-time 10 https://app.cnproject.test/
+
+Observed result:
+
+HTTP/1.1 502 Bad Gateway
+Server: nginx/1.31.6
+Content-Type: text/html
+X-Cache-Status: EXPIRED
+Cache-Control: public, max-age=60
+
+Diagnosis:
+
+The DNS service and nginx edge remained available, but both
+configured backend services were unavailable.
+
+nginx therefore could not successfully proxy the request to an
+upstream backend and returned HTTP 502 Bad Gateway.
+
+Layer affected:
+Backend / Application service layer
+
+Important observation:
+The client could still reach the HTTPS nginx endpoint, so the
+failure occurred after DNS resolution and TCP/TLS connection
+establishment.
+
+Recovery:
+Restart both Backend A and Backend B.

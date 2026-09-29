@@ -1,0 +1,49 @@
+Module 4 — HTTPS TCP/TLS Packet Capture Evidence
+
+Capture interface:
+lo0 (Loopback)
+
+Capture filter:
+tcp port 443
+
+Command:
+sudo tshark -i lo0 -f "tcp port 443"
+
+HTTPS request used:
+curl -i https://app.cnproject.test/
+
+Observed protocol flow:
+
+TCP connection establishment:
+1. SYN
+2. SYN, ACK
+3. ACK
+
+TLS handshake:
+5. TLS Client Hello (SNI=app.cnproject.test)
+7. TLS 1.3 Server Hello
+7. TLS 1.3 Change Cipher Spec / Application Data
+
+Encrypted communication:
+10. TLS 1.3 Application Data
+13. TLS 1.3 Application Data
+15. TLS 1.3 Application Data
+17. TLS 1.3 Application Data
+19. TLS 1.3 Application Data
+21. TLS 1.3 Application Data
+
+TCP connection termination:
+23. FIN, ACK
+24. ACK
+25. FIN, ACK
+26. ACK
+
+Total packets captured:
+26
+
+Verification:
+- TCP connection to port 443 was established using the TCP three-way handshake.
+- TLS Client Hello contained SNI for app.cnproject.test.
+- TLS 1.3 Server Hello was observed.
+- Subsequent application data was encrypted TLS application data.
+- TCP connection termination was observed with FIN/ACK packets.

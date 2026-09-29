@@ -1,0 +1,25 @@
+Module 4 — Failure Demonstration: Wrong Destination Port
+
+Test command:
+curl -i --max-time 5 https://app.cnproject.test:8444/
+
+Observed result:
+
+curl: (7) Failed to connect to app.cnproject.test port 8444
+after 5 ms: Couldn't connect to server
+
+Diagnosis:
+
+The client attempted to establish an HTTPS connection to port 8444.
+
+The project HTTPS service listens on port 443, not 8444.
+No service was listening on the requested destination port.
+
+Layer affected:
+Transport / TCP layer
+
+Correct destination:
+app.cnproject.test:443
+
+Recovery:
+Use the configured HTTPS destination port 443.

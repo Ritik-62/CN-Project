@@ -1,0 +1,50 @@
+Module 4 — Failure Demonstration: Backend A Stopped
+
+Initial state:
+
+Backend A was running with PID:
+80558
+
+Baseline HTTPS response:
+
+HTTP/1.1 200 OK
+X-Backend: A
+X-Cache-Status: EXPIRED
+Cache-Control: public, max-age=60
+
+Failure injection:
+
+Backend A was stopped using:
+
+kill 80558
+
+Verification:
+
+pgrep -f "backends/backend-a/server.py"
+
+No process was returned, confirming that Backend A was stopped.
+
+Failover test:
+
+curl -i https://app.cnproject.test/
+
+Observed result:
+
+HTTP/1.1 200 OK
+X-Backend: B
+X-Cache-Status: EXPIRED
+Cache-Control: public, max-age=60
+
+Backend B - CN Project
+
+Diagnosis:
+
+Backend A was unavailable, but nginx remained reachable.
+The load-balancer upstream selected Backend B and the client
+continued to receive a successful HTTPS response.
+
+Layer affected:
+Backend / Application service layer
+
+Recovery:
+Restart Backend A after completing the failure demonstration.

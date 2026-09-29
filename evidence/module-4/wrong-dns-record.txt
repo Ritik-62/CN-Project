@@ -1,0 +1,31 @@
+Module 4 — Failure Demonstration: Wrong DNS Record
+
+Test command:
+dig @10.7.29.220 wrong.cnproject.test
+
+Observed result:
+
+status: NXDOMAIN
+ANSWER: 0
+SERVER: 10.7.29.220#53(10.7.29.220)
+
+Diagnosis:
+
+The private DNS server was reachable, but the requested hostname
+wrong.cnproject.test does not have a configured DNS record.
+
+This is different from the wrong DNS server failure:
+the DNS server is correct, but the requested record is incorrect
+or does not exist.
+
+Correct project hostname:
+app.cnproject.test
+
+Correct resolution:
+app.cnproject.test → 10.7.29.220
+
+Layer affected:
+DNS / Application layer
+
+Recovery:
+Use the correct configured hostname and DNS record.

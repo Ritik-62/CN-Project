@@ -1,0 +1,25 @@
+Module 4 — DNS Packet Capture Evidence
+
+Capture interface:
+lo0 (Loopback)
+
+Capture filter:
+port 53
+
+Command:
+sudo tshark -i lo0 -f "port 53"
+
+Observed packets:
+
+1   0.000000  10.7.29.220 → 10.7.29.220  DNS 79 Standard query 0x21a0 A app.cnproject.test OPT
+
+2   0.000249  10.7.29.220 → 10.7.29.220  DNS 95 Standard query response 0x21a0 A app.cnproject.test A 10.7.29.220 OPT
+
+Packets captured:
+2
+
+Verification:
+- DNS query for app.cnproject.test was observed.
+- DNS response was observed.
+- app.cnproject.test resolved to 10.7.29.220.
+- DNS packet exchange was captured successfully with TShark.
