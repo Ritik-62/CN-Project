@@ -1,0 +1,26 @@
+Module 3 — HTTP Caching Evidence
+
+Cache-Control header:
+
+Cache-Control: public, max-age=60
+
+First request after previous cache entry expired:
+
+HTTP/1.1 200 OK
+X-Backend: A
+X-Cache-Status: EXPIRED
+Cache-Control: public, max-age=60
+
+Immediate repeated request:
+
+HTTP/1.1 200 OK
+X-Backend: A
+X-Cache-Status: HIT
+Cache-Control: public, max-age=60
+
+Verification:
+
+- nginx proxy caching is enabled.
+- Cache-Control specifies a 60-second cache lifetime.
+- EXPIRED indicates that the previous cached response had expired.
+- HIT demonstrates successful cache reuse.

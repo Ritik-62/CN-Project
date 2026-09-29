@@ -1,0 +1,23 @@
+Module 3 — TLS Verification Evidence
+
+Command:
+curl -i https://app.cnproject.test/
+
+Observed result:
+
+HTTP/1.1 200 OK
+Server: nginx/1.31.6
+Date: Tue, 29 Sep 2026 12:24:35 GMT
+Content-Type: text/plain
+Content-Length: 23
+Connection: keep-alive
+X-Backend: A
+X-Cache-Status: MISS
+
+Backend A - CN Project
+
+Verification:
+- HTTPS connection succeeded on port 443.
+- Certificate validation succeeded without using curl -k.
+- nginx terminated the TLS connection.
+- Request was successfully proxied to Backend A.
