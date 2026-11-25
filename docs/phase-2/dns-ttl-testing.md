@@ -51,5 +51,5 @@ Run the automated test suite:
 - Immediate query returns `127.0.0.1` without waiting for the 30-second timer.
 
 ## 4. Evidence Artifacts
-- **Test Output Log**: [dns-ttl-test.txt](file:///Users/ritikraj/CN-Project/evidence/phase-2/dns-ttl-test.txt)
-- **Wireshark / TShark Packet Capture**: [dns-ttl-capture.pcapng](file:///Users/ritikraj/CN-Project/evidence/phase-2/dns-ttl-capture.pcapng)
+- **Test Output Log**: [dns-ttl-test.txt](../../evidence/phase-2/dns-ttl-test.txt)
+- **Wireshark / TShark Packet Capture**: [dns-ttl-capture.pcapng](../../evidence/phase-2/dns-ttl-capture.pcapng)

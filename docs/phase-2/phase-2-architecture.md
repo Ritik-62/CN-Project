@@ -82,7 +82,7 @@ The implementation transitions the initial Phase 1 prototype into an enterprise-
 
 ### 3.5 Extension E: Controlled Edge Migration
 - **Standby Edge**: An independent nginx instance runs on port 9443 (`X-Edge: Standby`) with identical upstream routing and TLS termination.
-- **Cutover**: Authoritative DNS is updated to `127.0.0.2`. Standby Edge assumes traffic, enabling zero-downtime edge maintenance.
+- **Cutover**: Authoritative DNS is updated to `127.0.0.2`. Standby Edge assumes traffic, enabling controlled edge maintenance.
 
 ### 3.6 Extension F: Troubleshooting & Fault Management
 - **Diagnostic Engine**: `scripts/diagnose_stack.sh` systematically verifies Layer 1-3 (Interfaces), Layer 4 (Ports), Layer 5-6 (TLS & Certificates), and Layer 7 (DNS & HTTP applications), isolating root causes with automated remediation advice.

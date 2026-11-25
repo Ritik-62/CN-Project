@@ -49,4 +49,4 @@ Test suite: `./scripts/test_service_isolation.sh`
 | **Scenario D** | Backend B (:3002) | Via Standby Edge (`:9443`) | HTTP 200 OK | `200 OK` (`Allowed-Edge-Authenticated`) | **PASS** |
 | **Scenario E** | End-to-End | HTTPS `https://app.cnproject.test:8443/` | HTTP 200 OK | `200 OK` (`X-Edge: Main`) | **PASS** |
 
-Evidence log: [service-isolation-test.txt](file:///Users/ritikraj/CN-Project/evidence/phase-2/service-isolation-test.txt)
+Evidence log: [service-isolation-test.txt](../../evidence/phase-2/service-isolation-test.txt)

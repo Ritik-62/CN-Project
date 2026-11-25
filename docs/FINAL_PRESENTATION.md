@@ -19,7 +19,7 @@
 ## Slide 2: Problem Statement & Objectives
 - **Problem**: Modern web requests involve complex multi-layer networking dependencies (DNS, TCP, TLS, Reverse Proxying, Load Balancing). A failure at any single point disrupts service.
 - **Phase 1 Baseline**: Built core functionality (single DNS, single edge, round-robin backends, TLS termination).
-- **Phase 2 Mission**: Eliminate single points of failure, enforce service isolation, demonstrate real DNS TTL behavior, enable zero-downtime edge cutover, and build an automated diagnostic engine.
+- **Phase 2 Mission**: Eliminate single points of failure, enforce service isolation, demonstrate real DNS TTL behavior, enable controlled edge cutover, and build an automated diagnostic engine.
 
 ---
 
@@ -72,7 +72,7 @@
 ---
 
 ## Slide 7: Extension D — High Availability & Upstream Failover
-- **Concept**: Nginx passive health checks and zero-downtime backend resilience.
+- **Concept**: Nginx passive health checks and passive failover backend resilience.
 - **Implementation**:
   - `upstream cnproject_backends` with `max_fails=1 fail_timeout=5s`.
   - `proxy_next_upstream error timeout invalid_header http_502 http_503`.

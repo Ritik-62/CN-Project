@@ -3,7 +3,7 @@
 ## 1. Architecture Overview
 In enterprise networks, having redundant backend servers is not enough: the edge reverse proxy itself can be a **Single Point of Failure (SPOF)**. If the edge load balancer crashes or requires hardware maintenance, all client traffic is interrupted.
 
-**Extension E** introduces a **Standby Edge** instance, enabling zero-downtime edge migration via DNS cutover.
+**Extension E** introduces a **Standby Edge** instance, enabling controlled edge migration via DNS cutover.
 
 ```
                   AUTHORITATIVE DNS
@@ -68,4 +68,4 @@ Test suite: `./scripts/test_edge_migration.sh`
 - Execute `manage_dns.sh reset-records` and flush cache.
 - Traffic cleanly reverts to Main Edge (`X-Edge: Main`).
 
-Evidence log: [edge-migration-test.txt](file:///Users/ritikraj/CN-Project/evidence/phase-2/edge-migration-test.txt)
+Evidence log: [edge-migration-test.txt](../../evidence/phase-2/edge-migration-test.txt)

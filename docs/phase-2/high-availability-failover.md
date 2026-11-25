@@ -59,4 +59,4 @@ Test suite: `./scripts/test_ha_failover.sh`
 - **Result**: Application auto-recovered to HTTP 200 OK without rebuilding or restarting nginx.
 - **Verdict**: **PASS** — Self-healing infrastructure verified.
 
-Evidence log: [ha-failover-test.txt](file:///Users/ritikraj/CN-Project/evidence/phase-2/ha-failover-test.txt)
+Evidence log: [ha-failover-test.txt](../../evidence/phase-2/ha-failover-test.txt)

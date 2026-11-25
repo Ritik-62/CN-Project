@@ -42,8 +42,8 @@ The automated test script is executed via:
   Primary DNS restarted. Subsequent queries immediately hit Primary DNS as preferred resolver.
 
 ## 3. Evidence Artifacts
-- **Automated Test Log**: [backup-dns-failover-test.txt](file:///Users/ritikraj/CN-Project/evidence/phase-2/backup-dns-failover-test.txt)
-- **Wireshark / TShark Packet Capture**: [backup-dns-failover.pcapng](file:///Users/ritikraj/CN-Project/evidence/phase-2/backup-dns-failover.pcapng)
+- **Automated Test Log**: [backup-dns-failover-test.txt](../../evidence/phase-2/backup-dns-failover-test.txt)
+- **Wireshark / TShark Packet Capture**: [backup-dns-failover.pcapng](../../evidence/phase-2/backup-dns-failover.pcapng)
 
 ### Packet Breakdown (`backup-dns-failover.pcapng`)
 | Packet # | Protocol | Source → Destination | Description |

@@ -43,13 +43,13 @@ A comprehensive engineering audit was conducted across all subsystems of the Pha
   - When authoritative record changed to `127.0.0.2`, caching resolver continued to serve cached `127.0.0.1` until TTL expiration (Eventual consistency verified).
   - After expiration, fetched new IP `127.0.0.2` with fresh TTL=30.
   - Manual SIGHUP cache flush immediately invalidated cache and fetched updated IP without waiting for timer (PASS).
-- **DNS Failover**: Client resolver script successfully caught primary outage and transparently resolved via backup. Real packet capture saved to [backup-dns-failover.pcapng](file:///Users/ritikraj/CN-Project/evidence/phase-2/backup-dns-failover.pcapng).
+- **DNS Failover**: Client resolver script successfully caught primary outage and transparently resolved via backup. Real packet capture saved to [backup-dns-failover.pcapng](../../evidence/phase-2/backup-dns-failover.pcapng).
 
 ### 2.3 Security Audit (Extension C)
 - **Secret Hardcoding Remediation**:
   - Hardcoded tokens in Python server code and Nginx configs were eliminated.
-  - Service authentication secret is now dynamically loaded from `CN_EDGE_SECRET` or [config/.secrets.env](file:///Users/ritikraj/CN-Project/config/.secrets.env) with file mode `0600`.
-  - Nginx injects the secret via restricted include file [config/nginx/security-token.conf](file:///Users/ritikraj/CN-Project/config/nginx/security-token.conf) (`0600`).
+  - Service authentication secret is now dynamically loaded from `CN_EDGE_SECRET` or [config/.secrets.env](../../config/.secrets.env) with file mode `0600`.
+  - Nginx injects the secret via restricted include file [config/nginx/security-token.conf](../../config/nginx/security-token.conf) (`0600`).
 - **Service Isolation Enforcement**:
   - *Direct Client Access*: Sending unauthenticated requests to `http://127.0.0.1:3001/` or `http://127.0.0.1:3002/` returned **HTTP 403 Forbidden** (`X-Isolation-Status: Blocked-Direct-Access-Denied`).
   - *Edge-Proxied Access*: Requests via Main Edge (`:8443`) or Standby Edge (`:9443`) were authenticated and returned **HTTP 200 OK** (`X-Isolation-Status: Allowed-Edge-Authenticated`).

@@ -1,228 +1,179 @@
 # Private Network Service Platform (Phase 1 & Phase 2)
 
-## Computer Networks Course Project
+![Platform](https://img.shields.io/badge/Platform-macOS%20Apple%20Silicon-555555?style=flat&logo=apple)
+![Topology](https://img.shields.io/badge/Topology-4%20Logical%20Nodes%20%7C%201%20Physical%20Mac-blue?style=flat)
+![DNS](https://img.shields.io/badge/DNS-Primary%20%2B%20Backup%20%2B%20Cache-green?style=flat)
+![Proxy](https://img.shields.io/badge/Proxy-nginx%20(Main%20%2B%20Standby)-orange?style=flat)
+![Verification](https://img.shields.io/badge/Tests-Verified%20(Extensions%20A--F)-brightgreen?style=flat)
 
 > **"The application stays simple — the network is the project."**
 
-This project is an empirical implementation and evaluation of a hardened, multi-tier private network service platform. Rather than building complex application business logic, this platform implements decoupled networking infrastructure to demonstrate what happens across every layer of the protocol stack when a client accesses a private domain service.
+This repository contains the architecture, implementation, and empirical evaluation of a hardened multi-tier private network service platform built as a controlled laboratory environment. Rather than focusing on complex application logic, this project implements decoupled networking infrastructure to examine and verify behavior across the network protocol stack (DNS, TCP, TLS, HTTP, and load balancing).
 
-All services operate on **ONE physical Apple Silicon MacBook Pro**, simulating a four-machine network topology through decoupled, isolated daemon processes and loopback socket bindings.
-
----
-
-## 1. Project Overview & Problem Statement
-A simple request such as:
-```text
-https://app.cnproject.test:8443/api/status
-```
-traverses an intricate chain of network protocol layers:
-```text
-Domain Name (app.cnproject.test)
-     ↓
-DNS Resolution (Primary / Backup Failover / Caching Resolver)
-     ↓
-TCP Three-Way Handshake (SYN → SYN/ACK → ACK)
-     ↓
-TLS 1.3 Negotiation (ClientHello, SNI, ServerHello, Certificate Validation)
-     ↓
-HTTPS Request (Encrypted Application Data)
-     ↓
-Edge Reverse Proxy (nginx with Service Isolation Token Injection)
-     ↓
-Load Balancing (Passive Health Checks & Failover Routing)
-     ↓
-Backend Compute Service (Backend A or Backend B)
-     ↓
-HTTP Response (Custom Headers: X-Edge, X-Backend, X-Cache-Status)
-     ↓
-TCP Connection Teardown (FIN/ACK)
-```
-
-In production networks, systems that work under ideal conditions often collapse when faults occur. Phase 1 established the baseline request flow; **Phase 2 hardens the platform**, eliminating single points of failure, enforcing service isolation, demonstrating DNS TTL expiration, enabling standby edge migration, and providing an automated diagnostic engine.
+All services run on **one physical Apple Silicon MacBook**, simulating a four-machine network topology using decoupled, isolated daemon processes and loopback socket bindings on `127.0.0.1`.
 
 ---
 
-## 2. Logical Architecture & Single-Mac Simulation
+## Architecture Overview
 
-The course project topology defines four machine roles. On our single physical Mac, these roles are simulated via independent processes, distinct ports, dedicated configuration files, and separate PID/log files:
+```mermaid
+flowchart TD
+    Client["Client (curl / dig / Browser)"]
+    
+    subgraph M1["Node 1: DNS Subsystem"]
+        Cache["Caching Resolver<br/>:5356 (TTL Cache)"]
+        PriDNS["Primary DNS<br/>:5355 (TTL=30s)"]
+        BakDNS["Backup DNS<br/>:5354 (TTL=30s)"]
+        Cache -->|Forward| PriDNS
+        Cache -.->|Failover| BakDNS
+    end
 
-```
-+---------------------------------------------------------------------------------------------------------+
-|                                    PHYSICAL WORKSTATION: APPLE SILICON MACBOOK                          |
-|                                                                                                         |
-|  +----------------------------------+                   +--------------------------------------------+  |
-|  |     MACHINE 1: DNS SUBSYSTEM     |                   |       MACHINE 2: MAIN EDGE (REVERSE PROXY) |  |
-|  |                                  |                   |                                            |  |
-|  |  [Primary Authoritative DNS]     |                   |  [nginx Reverse Proxy / Load Balancer]     |  |
-|  |  Socket: 127.0.0.1:5355          |                   |  HTTPS Socket: 127.0.0.1:8443 (TLS Term.)  |  |
-|  |  TTL: 30 seconds                 |                   |  HTTP Socket:  127.0.0.1:8080              |  |
-|  |                                  |                   |  Response Header: X-Edge: Main             |  |
-|  |  [Backup Authoritative DNS]      |                   +---------------------+----------------------+  |
-|  |  Socket: 127.0.0.1:5354          |                                         |                         |
-|  |  TTL: 30 seconds                 |                                         | Upstream Proxying       |
-|  |                                  |                                         | (Passive Health Checks) |
-|  |  [Local Caching Resolver]        |                                         v                         |
-|  |  Socket: 127.0.0.1:5356          |                   +--------------------------------------------+  |
-|  |  Cache Size: 150 entries         |                   |           UPSTREAM BACKEND TIER            |  |
-|  +----------------------------------+                   |                                            |  |
-|                                                         |  +--------------------------------------+  |  |
-|                                                         |  |      MACHINE 3: BACKEND SERVER A     |  |  |
-|                                                         |  |  Socket: 127.0.0.1:3001              |  |  |
-|                                                         |  |  Identity: X-Backend: A              |  |  |
-|                                                         |  |  Policy: Service Isolation Token     |  |  |
-|                                                         |  +--------------------------------------+  |  |
-|                                                         |                                            |  |
-|  +----------------------------------+                   |  +--------------------------------------+  |  |
-|  |      MACHINE 4: STANDBY EDGE     |                   |  |      MACHINE 4: BACKEND SERVER B     |  |  |
-|  |                                  |                   |  Socket: 127.0.0.1:3002              |  |  |
-|  |  [Standby nginx Reverse Proxy]   |                   |  Identity: X-Backend: B              |  |  |
-|  |  HTTPS Socket: 127.0.0.1:9443    |                   |  Policy: Service Isolation Token     |  |  |
-|  |  Response Header: X-Edge: Standby|                   |  +--------------------------------------+  |  |
-|  +----------------------------------+                   +--------------------------------------------+  |
-+---------------------------------------------------------------------------------------------------------+
+    subgraph EdgeTier["Edge Reverse Proxy Tier"]
+        MainEdge["Node 2: Main Edge (nginx)<br/>HTTPS :8443 | HTTP :8080<br/>Header: X-Edge: Main"]
+        StandbyEdge["Node 4: Standby Edge (nginx)<br/>HTTPS :9443 | HTTP :9080<br/>Header: X-Edge: Standby"]
+    end
+
+    subgraph Backends["Backend Compute Tier"]
+        BackendA["Node 3: Backend A<br/>:3001 | X-Backend: A<br/>Policy: Token Auth"]
+        BackendB["Node 4: Backend B<br/>:3002 | X-Backend: B<br/>Policy: Token Auth"]
+    end
+
+    Client -->|1. Resolve| Cache
+    Client -->|2. HTTPS Request| MainEdge
+    MainEdge -->|3. Load Balance| BackendA
+    MainEdge -->|3. Passive Failover| BackendB
+    StandbyEdge -.->|Migration Path| BackendA
+    StandbyEdge -.->|Migration Path| BackendB
 ```
 
----
+### Single-Mac Simulation Mapping
 
-## 3. Technology Stack & Port Allocation Table
-
-### Technology Stack
-- **Operating System**: macOS Darwin (Apple Silicon arm64)
-- **Authoritative & Caching DNS**: `dnsmasq` version 2.93
-- **Edge Reverse Proxy & Load Balancer**: `nginx` version 1.31.6
-- **Packet Capture & Inspection**: `TShark` / `Wireshark` version 4.6.9
-- **Backend Application Services**: Python 3.11+ standard library (`http.server`)
-- **Certificates & TLS**: OpenSSL 3.x (Self-signed CA with SAN extension)
-
-### Port Allocation Reference
-
-| Role / Identifier | Logical Node | Protocol | Port | Description | Health Command |
-|---|---|---|---|---|---|
-| **Primary DNS** | Machine 1 | UDP/TCP | `5355` | Authoritative Primary DNS (TTL=30) | `dig @127.0.0.1 -p 5355 app.cnproject.test` |
-| **Backup DNS** | Machine 1 | UDP/TCP | `5354` | Authoritative Backup DNS (TTL=30) | `dig @127.0.0.1 -p 5354 app.cnproject.test` |
-| **Caching Resolver** | Machine 1 | UDP/TCP | `5356` | Local Caching Forwarder | `dig @127.0.0.1 -p 5356 app.cnproject.test` |
-| **Main Edge HTTPS** | Machine 2 | TCP | `8443` | Primary Reverse Proxy (TLS Term.) | `curl -k https://127.0.0.1:8443/api/status` |
-| **Main Edge HTTP** | Machine 2 | TCP | `8080` | Primary Cleartext Proxy | `curl http://127.0.0.1:8080/api/status` |
-| **Standby Edge HTTPS** | Machine 4 | TCP | `9443` | Standby Reverse Proxy (TLS Term.) | `curl -k https://127.0.0.1:9443/api/status` |
-| **Standby Edge HTTP** | Machine 4 | TCP | `9080` | Standby Cleartext Proxy | `curl http://127.0.0.1:9080/api/status` |
-| **Backend Server A** | Machine 3 | TCP | `3001` | Application Server Node A | `curl http://127.0.0.1:3001/health` |
-| **Backend Server B** | Machine 4 | TCP | `3002` | Application Server Node B | `curl http://127.0.0.1:3002/health` |
-| **NOC Dashboard** | Host | TCP | `8000` | Real-time Operations Dashboard | `http://127.0.0.1:8000/` |
+The four logical machines defined in the course specification are mapped to isolated daemon processes on macOS:
+- **Logical Machine 1 (DNS & Client)**: Authoritative Primary DNS (`:5355`), Authoritative Backup DNS (`:5354`), Caching Resolver (`:5356`), and client testing utilities.
+- **Logical Machine 2 (Main Edge)**: Primary `nginx` reverse proxy with TLS 1.3 termination (`:8443`), cleartext proxy (`:8080`), response caching, and upstream load balancing.
+- **Logical Machine 3 (Backend Server A)**: Application server running on port `3001` (`X-Backend: A`) with service isolation enforcement.
+- **Logical Machine 4 (Backend Server B & Standby Edge)**: Application server running on port `3002` (`X-Backend: B`) and Standby `nginx` reverse proxy running on port `9443` (`X-Edge: Standby`).
 
 ---
 
-## 4. Phase 2 Hardening Extensions
+## Feature Summary
 
-### Extension A: Redundant Backup DNS Resolver
-- **Mechanics**: Runs independent Primary (`:5355`) and Backup (`:5354`) `dnsmasq` instances with synchronized authoritative records.
-- **Client Failover**: `scripts/dns_client_resolver.sh` enforces query ordering (Primary first, 1s timeout, failover to Backup upon timeout/failure).
-- **Verification**: Stopping Primary DNS results in zero dropped queries; client seamlessly resolves via Backup. Real pcap saved to `evidence/phase-2/backup-dns-failover.pcapng`.
+### Phase 1: Foundation Baseline
+- **Private DNS**: Domain `app.cnproject.test` resolved via `dnsmasq`.
+- **Reverse Proxy & Load Balancing**: `nginx` round-robin proxying across Python HTTP backends.
+- **HTTPS & TLS 1.3**: Secure TLS termination with custom Certificate Authority (CA) and SAN extensions.
+- **Response Caching**: Edge microcaching with `X-Cache-Status` headers (`HIT`, `MISS`, `EXPIRED`).
+- **Protocol Analysis**: Wireshark captures of TCP handshakes, TLS negotiation, and failure scenarios.
 
-### Extension B: DNS TTL & Caching Resolver
-- **Mechanics**: Authoritative responses return `local-ttl=30`. A local caching resolver (`:5356`) stores responses and decrements TTL over time.
-- **Eventual Consistency Demonstration**: When authoritative records change from `127.0.0.1` to `127.0.0.2`, the caching resolver continues serving the old IP until the 30s TTL timer expires. Manual SIGHUP flush demonstrates immediate cache invalidation.
-- **Verification**: `scripts/test_dns_ttl.sh` verifies TTL countdown, stale cache retention, expiration, and manual flushing. Packet capture: `evidence/phase-2/dns-ttl-capture.pcapng`.
-
-### Extension C: Service Isolation & Backend Security
-- **Mechanics**: On a single Mac, loopback IP filtering cannot differentiate between local client curl processes and nginx proxy workers. We implemented an application-layer defense-in-depth model:
-  - Edge proxies inject an authenticated header `X-CN-Edge-Token`.
-  - Backends reject direct client access (`http://127.0.0.1:3001/`) with **HTTP 403 Forbidden** (`X-Isolation-Status: Blocked-Direct-Access-Denied`).
-  - Edge-proxied requests (`https://app.cnproject.test:8443/`) are authenticated and return **HTTP 200 OK** (`X-Isolation-Status: Allowed-Edge-Authenticated`).
-- **Verification**: `scripts/test_service_isolation.sh` verifies all 5 required access control scenarios.
-
-### Extension D: Upstream High Availability & Failover
-- **Mechanics**: Configured nginx passive health checks:
-  ```nginx
-  upstream cnproject_backends {
-      server 127.0.0.1:3001 max_fails=1 fail_timeout=5s;
-      server 127.0.0.1:3002 max_fails=1 fail_timeout=5s;
-  }
-  proxy_next_upstream error timeout invalid_header http_502 http_503;
-  proxy_next_upstream_tries 2;
-  ```
-- **Verification**:
-  - Backend A halted: 100% of requests routed to Backend B with zero dropped requests.
-  - Backend A restarted: After 5s `fail_timeout`, load balancing auto-resumes.
-  - Both backends halted: Controlled `HTTP 502 Bad Gateway` returned.
-  - Backends restarted: Self-healing auto-recovery.
-
-### Extension E: Controlled Edge Migration (Standby Edge)
-- **Mechanics**: Standby nginx proxy deployed on port 9443 emitting header `X-Edge: Standby` (Main Edge emits `X-Edge: Main`).
-- **Verification**: DNS cutover via `manage_dns.sh set-record 127.0.0.2` migrates traffic to Standby Edge. Rollback cleanly restores Main Edge.
-
-### Extension F: Troubleshooting & Diagnostic Engine
-- **Mechanics**: `scripts/diagnose_stack.sh` inspects Layer 1-3 (Interfaces), Layer 4 (Ports), Layer 5-6 (TLS & Certificates), and Layer 7 (DNS & HTTP applications), providing root-cause isolation and recovery guidance.
-- **Fault Management**: `scripts/fault_manager.sh` injects controlled faults and executes master recovery.
+### Phase 2: Network Hardening & Failover Extensions
+- **Extension A (Backup DNS)**: Independent backup DNS resolver (`:5354`) with client-side failover script (`scripts/dns_client_resolver.sh`).
+- **Extension B (DNS TTL & Cache)**: 30-second authoritative TTL with local caching forwarder (`:5356`), demonstrating TTL countdown, stale cache retention during IP migration (`127.0.0.2`), expiration, and manual SIGHUP cache flush.
+- **Extension C (Service Isolation)**: Application-layer token isolation; direct backend access is rejected with `HTTP 403 Forbidden` (`X-Isolation-Status: Blocked-Direct-Access-Denied`), while edge-proxied requests inject the token and return `HTTP 200 OK`.
+- **Extension D (High Availability)**: Upstream passive health monitoring (`max_fails=1 fail_timeout=5s`) and failover routing (`proxy_next_upstream`) redirecting failed requests to the healthy backend during a single-node outage in sequential tests.
+- **Extension E (Standby Edge Migration)**: Standby reverse proxy (`:9443`, `X-Edge: Standby`) with controlled DNS cutover and verified rollback to the main edge.
+- **Extension F (Diagnostic Engine & Fault Manager)**: Automated Layer 1–7 diagnostic scanner (`scripts/diagnose_stack.sh`) and fault injection engine (`scripts/fault_manager.sh`).
 
 ---
 
-## 5. Operations & Demonstration Instructions
+## Port Allocation Reference
 
-### Prerequisites
+| Subsystem / Service | Node | Protocol | Port | Description | Health Check Command |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Primary DNS** | Node 1 | UDP/TCP | `5355` | Authoritative Primary DNS (TTL=30) | `dig @127.0.0.1 -p 5355 app.cnproject.test` |
+| **Backup DNS** | Node 1 | UDP/TCP | `5354` | Authoritative Backup DNS (TTL=30) | `dig @127.0.0.1 -p 5354 app.cnproject.test` |
+| **Caching Resolver** | Node 1 | UDP/TCP | `5356` | Local Caching Forwarder (150 names) | `dig @127.0.0.1 -p 5356 app.cnproject.test` |
+| **Main Edge (HTTPS)** | Node 2 | TCP | `8443` | Primary Proxy & TLS Termination | `curl -k https://127.0.0.1:8443/api/status` |
+| **Main Edge (HTTP)** | Node 2 | TCP | `8080` | Primary Cleartext Proxy | `curl http://127.0.0.1:8080/api/status` |
+| **Standby Edge (HTTPS)** | Node 4 | TCP | `9443` | Standby Proxy & TLS Termination | `curl -k https://127.0.0.1:9443/api/status` |
+| **Standby Edge (HTTP)** | Node 4 | TCP | `9080` | Standby Cleartext Proxy | `curl http://127.0.0.1:9080/api/status` |
+| **Backend Server A** | Node 3 | TCP | `3001` | Upstream Server Node A | `curl http://127.0.0.1:3001/health` |
+| **Backend Server B** | Node 4 | TCP | `3002` | Upstream Server Node B | `curl http://127.0.0.1:3002/health` |
+| **NOC Web Dashboard** | Host | TCP | `8000` | Real-time Operations Dashboard | `http://127.0.0.1:8000/` |
+
+---
+
+## Quick Start & Verification
+
+### 1. Prerequisites
 - macOS Apple Silicon (arm64)
-- Homebrew packages: `dnsmasq`, `nginx`, `wireshark` (`tshark`), Python 3.11+
+- Homebrew dependencies: `brew install dnsmasq nginx wireshark python3`
 
-### Master Service Controls
+### 2. Service Management
 ```bash
-# Start all 4 logical machines
+# Start all 4 logical machines (DNS, Main Edge, Standby Edge, Backends)
 ./scripts/manage_services.sh start-all
 
-# Inspect status of all subsystems
+# Check live health status of all subsystems
 ./scripts/manage_services.sh status
 
-# Stop all services
+# Stop all background processes
 ./scripts/manage_services.sh stop-all
 ```
 
-### Centralized NOC Dashboard
-Launch the web operations dashboard:
+### 3. Centralized NOC Dashboard
+Launch the live web dashboard for real-time monitoring and fault injection:
 ```bash
 python3 scripts/dashboard_server.py &
 open http://127.0.0.1:8000/
 ```
-The dashboard updates every 2 seconds, displaying live machine statuses, PID tracking, DNS synchronization, and interactive demonstration controls.
+The dashboard auto-refreshes every 2 seconds, displaying process statuses, PIDs, active DNS IPs, and interactive demonstration controls.
 
-### Running Test Suites
+### 4. Running Test Suites
 ```bash
-# Run Master Phase 2 Verification Suite (Tests Extensions A through F)
+# Execute master verification suite (runs Extensions A through F sequentially)
 ./scripts/run_all_phase2_tests.sh
 
-# Run Individual Extension Tests:
-./scripts/test_dns_failover.sh       # Extension A
-./scripts/test_dns_ttl.sh            # Extension B
-./scripts/test_service_isolation.sh  # Extension C
-./scripts/test_ha_failover.sh        # Extension D
-./scripts/test_edge_migration.sh     # Extension E
-./scripts/diagnose_stack.sh          # Extension F
+# Run individual test suites
+./scripts/test_dns_failover.sh       # Extension A: DNS failover
+./scripts/test_dns_ttl.sh            # Extension B: TTL countdown & cache flush
+./scripts/test_service_isolation.sh  # Extension C: 403 vs 200 token isolation
+./scripts/test_ha_failover.sh        # Extension D: Upstream failure & auto-recovery
+./scripts/test_edge_migration.sh     # Extension E: Standby cutover & rollback
+./scripts/diagnose_stack.sh          # Extension F: Layer 1-7 diagnostic scan
 ```
 
 ---
 
-## 6. Academic Deliverables Index
+## Documentation Index
 
-- [docs/PHASE2_FINAL_REPORT.md](file:///Users/ritikraj/CN-Project/docs/PHASE2_FINAL_REPORT.md) — Comprehensive academic project report.
-- [docs/ARCHITECTURE.md](file:///Users/ritikraj/CN-Project/docs/ARCHITECTURE.md) — Detailed architecture specification and Mermaid diagrams.
-- [docs/TESTING_AND_EVIDENCE.md](file:///Users/ritikraj/CN-Project/docs/TESTING_AND_EVIDENCE.md) — Extension-by-extension testing and verification logs.
-- [docs/CONFIGURATION_GUIDE.md](file:///Users/ritikraj/CN-Project/docs/CONFIGURATION_GUIDE.md) — Configuration guide and port allocations.
-- [docs/TROUBLESHOOTING.md](file:///Users/ritikraj/CN-Project/docs/TROUBLESHOOTING.md) — Layer 1–7 troubleshooting guide and fault matrix.
-- [docs/VIVA_QUESTIONS.md](file:///Users/ritikraj/CN-Project/docs/VIVA_QUESTIONS.md) — 30 comprehensive technical viva questions and answers.
-- [docs/FINAL_PRESENTATION.md](file:///Users/ritikraj/CN-Project/docs/FINAL_PRESENTATION.md) — Slide-by-slide final presentation outline.
-- [docs/phase-2/final-engineering-audit.md](file:///Users/ritikraj/CN-Project/docs/phase-2/final-engineering-audit.md) — Engineering audit and security findings.
-- [evidence/README.md](file:///Users/ritikraj/CN-Project/evidence/README.md) — Index of all runtime logs and Wireshark captures.
+Detailed architectural analyses, configuration guides, and evaluation reports are organized in the [`docs/`](docs/) directory:
 
----
-
-## 7. Limitations & Single-Mac Adaptations
-
-1. **Host-Level Fault Domain**: All four simulated machines run on one physical MacBook. A kernel crash or power outage affects all nodes simultaneously. In production, these roles would be distributed across distinct physical availability zones.
-2. **DNS Port Invariance**: Standard DNS A-records map hostnames to IP addresses; they do not encode port numbers. Consequently, migrating traffic from port 8443 to port 9443 on the same IP requires client-side port awareness.
-3. **Loopback Traffic Encapsulation**: Inter-process traffic on `127.0.0.1` does not traverse a physical switch and is captured via the Darwin loopback interface (`lo0`).
+- [`docs/README.md`](docs/README.md) — Master documentation index and guide.
+- [`docs/PHASE2_FINAL_REPORT.md`](docs/PHASE2_FINAL_REPORT.md) — Academic report covering Sections 1–10.
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — System topology, sequence diagrams, and port allocations.
+- [`docs/TESTING_AND_EVIDENCE.md`](docs/TESTING_AND_EVIDENCE.md) — Test reproduction steps, terminal outputs, and pcap references.
+- [`docs/CONFIGURATION_GUIDE.md`](docs/CONFIGURATION_GUIDE.md) — DNS configurations, nginx blocks, and secrets setup.
+- [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md) — Layer 1–7 diagnostic hierarchy and fault recovery matrix.
+- [`docs/VIVA_QUESTIONS.md`](docs/VIVA_QUESTIONS.md) — 30 technical viva examination questions with architectural answers.
+- [`docs/FINAL_PRESENTATION.md`](docs/FINAL_PRESENTATION.md) — 12-slide demonstration deck outline.
+- [`docs/PHASE1_BASELINE_README.md`](docs/PHASE1_BASELINE_README.md) — Complete original Phase 1 documentation baseline.
 
 ---
 
-## 8. Author & Repository
+## Evidence & Wireshark Captures
+
+Verified runtime logs and loopback `.pcapng` packet captures are maintained in [`evidence/`](evidence/):
+- [`evidence/README.md`](evidence/README.md) — Index of all Phase 1 and Phase 2 evidence.
+- [`evidence/phase-2/master-phase2-test-report.txt`](evidence/phase-2/master-phase2-test-report.txt) — Unified test execution output.
+- [`evidence/phase-2/backup-dns-failover.pcapng`](evidence/phase-2/backup-dns-failover.pcapng) — Primary DNS timeout and backup resolution capture.
+- [`evidence/phase-2/dns-ttl-capture.pcapng`](evidence/phase-2/dns-ttl-capture.pcapng) — 30-second TTL countdown and cache expiration capture.
+
+---
+
+## Limitations & Single-Mac Adaptations
+
+1. **Host-Level Fault Domain**: All four simulated nodes share one physical macOS kernel and CPU. Hardware failure or operating system restart impacts all nodes concurrently.
+2. **DNS Port Invariance**: Standard DNS A-records resolve domain names to IP addresses without port information. Routing between Main Edge (`:8443`) and Standby Edge (`:9443`) on the same host requires port-aware client targeting or distinct loopback IP aliases (`127.0.0.1` vs `127.0.0.2`).
+3. **Loopback Traffic Encapsulation**: All inter-node traffic traverses the Darwin loopback interface (`lo0`) rather than physical Ethernet/Wi-Fi hardware, which eliminates real-world physical wire latency, propagation delay, and transmission errors.
+4. **Firewall vs. Application-Layer Isolation**: Because macOS loopback packet filtering (`pf`) cannot distinguish between local processes sharing `127.0.0.1`, service isolation is enforced at the application layer via HTTP header token validation (`X-CN-Edge-Token`) rather than OS-level firewall packet filtering.
+
+---
+
+## Conclusion & Repository Status
+
+This platform demonstrates controlled network resilience, failover mechanics, and protocol inspection within a lab-scale simulated multi-tier architecture on a single physical machine.
+
 - **Author**: Ritik Raj
-- **Course**: Computer Networks Course Project
 - **Git Branch**: `phase2-single-mac`
-- **Backup Branch**: `phase1-backup`
-- **GitHub Repository**: [https://github.com/Ritik-62/CN-Project](https://github.com/Ritik-62/CN-Project)
+- **Backup Baseline**: `phase1-backup` (Commit `560da04`)
+- **Remote Repository**: [GitHub — Ritik-62/CN-Project](https://github.com/Ritik-62/CN-Project)
