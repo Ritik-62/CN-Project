@@ -1,0 +1,46 @@
+worker_processes 1;
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    proxy_cache_path /opt/homebrew/var/cache/nginx/cnproject levels=1:2 keys_zone=cnproject_cache:10m max_size=100m inactive=60m use_temp_path=off;
+    upstream cnproject_backends {
+        server 127.0.0.1:3001;
+        server 127.0.0.1:3002;
+    }
+
+    server {
+        listen 80;
+        server_name app.cnproject.test api.cnproject.test;
+
+        location / {
+            proxy_pass http://cnproject_backends;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+    }
+
+    server {
+        listen 443 ssl;
+        server_name app.cnproject.test api.cnproject.test;
+
+        ssl_certificate /Users/ritikraj/CN-Project/config/nginx/certs/app.cnproject.test.crt;
+        ssl_certificate_key /Users/ritikraj/CN-Project/config/nginx/certs/app.cnproject.test.key;
+
+        location / {
+            proxy_cache cnproject_cache;
+            proxy_cache_valid 200 60s;
+            add_header X-Cache-Status $upstream_cache_status always;
+            add_header Cache-Control "public, max-age=60" always;
+            proxy_pass http://cnproject_backends;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+    }
+}

@@ -1,0 +1,3 @@
+# Restricted nginx proxy security token snippet example
+# Copy this file to config/nginx/security-token.conf and set chmod 600
+proxy_set_header X-CN-Edge-Token "replace-with-your-edge-auth-token";

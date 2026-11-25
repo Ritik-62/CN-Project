@@ -3,5 +3,8 @@
 *.pyc
 __pycache__/
 .env
+.secrets.env
+*.secret
 *.key
 *.pem
+security-token.conf

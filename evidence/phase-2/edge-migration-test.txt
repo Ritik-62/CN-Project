@@ -1,0 +1,64 @@
+============================================================
+EXTENSION E: CONTROLLED EDGE MIGRATION (DNS CUTOVER) TEST
+Date: Wed Nov 25 20:11:22 IST 2026
+Host: Ritiks-MacBook-Pro-3.local (arm64)
+============================================================
+
+--- Step 1: Ensuring All Services (Main Edge, Standby Edge, Backends, DNS) Active ---
+[DNS Admin] Setting app.cnproject.test -> 127.0.0.1 in /Users/ritikraj/CN-Project/config/dnsmasq/records.hosts...
+[Primary DNS] Dynamic reload triggered.
+[Backup DNS] Dynamic reload triggered.
+[DNS Admin] DNS record update complete.
+
+--- Step 2: Baseline Traffic to Main Edge (Port 8443) ---
+Sending requests to Main Edge:
+Request 1 -> X-Edge: Main | X-Backend: A
+Request 2 -> X-Edge: Main | X-Backend: B
+Request 3 -> X-Edge: Main | X-Backend: A
+
+--- Step 3: Standby Edge Pre-Flight Health Check (Port 9443) ---
+Testing Standby Edge readiness prior to cutover:
+HTTP/1.1 200 OK
+X-Backend: A
+X-Edge: Standby
+SUCCESS: Standby Edge is healthy and ready for traffic migration.
+
+--- Step 4: Initiate Controlled DNS Cutover to Standby Edge ---
+Updating DNS authoritative records for app.cnproject.test to Standby Edge endpoint (127.0.0.2)...
+[DNS Admin] Setting app.cnproject.test -> 127.0.0.2 in /Users/ritikraj/CN-Project/config/dnsmasq/records.hosts...
+[Primary DNS] Dynamic reload triggered.
+[Backup DNS] Dynamic reload triggered.
+[DNS Admin] DNS record update complete.
+Direct Authoritative DNS Query after cutover:
+
+; <<>> DiG 9.10.6 <<>> @127.0.0.1 -p 5355 app.cnproject.test +noall +answer
+; (1 server found)
+;; global options: +cmd
+app.cnproject.test.	30	IN	A	127.0.0.2
+
+--- Step 5: Traffic Verification on Standby Edge (Port 9443) ---
+Sending requests to Standby Edge post-migration:
+Request 1 -> X-Edge: Standby | X-Backend: B
+Request 2 -> X-Edge: Standby | X-Backend: A
+Request 3 -> X-Edge: Standby | X-Backend: B
+Request 4 -> X-Edge: Standby | X-Backend: A
+SUCCESS: Standby Edge is successfully serving application traffic with load balancing active across backends!
+
+--- Step 6: Rollback to Main Edge ---
+Reverting DNS record to Main Edge (127.0.0.1)...
+[DNS Admin] Setting app.cnproject.test -> 127.0.0.1 in /Users/ritikraj/CN-Project/config/dnsmasq/records.hosts...
+[Primary DNS] Dynamic reload triggered.
+[Backup DNS] Dynamic reload triggered.
+[DNS Admin] DNS record update complete.
+[Caching Resolver] Flushing DNS cache (SIGHUP -> PID 4534)...
+[Caching Resolver] Cache flushed successfully.
+Verifying traffic routed back to Main Edge:
+HTTP/1.1 200 OK
+X-Backend: B
+X-Edge: Main
+SUCCESS: Rollback complete. Main Edge resumed serving traffic.
+
+============================================================
+EXTENSION E: EDGE MIGRATION TEST COMPLETED SUCCESSFULLY
+Evidence written to: /Users/ritikraj/CN-Project/evidence/phase-2/edge-migration-test.txt
+============================================================

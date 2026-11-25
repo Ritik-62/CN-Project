@@ -1,0 +1,145 @@
+============================================================
+STAGE 3: DNS TTL & CONTROLLED RECORD CHANGE DEMONSTRATION
+Date: Wed Nov 25 20:10:09 IST 2026
+Host: Ritiks-MacBook-Pro-3.local (arm64)
+============================================================
+
+--- Step 1: Ensure DNS Services Running with Baseline Records ---
+[DNS Admin] Setting app.cnproject.test -> 127.0.0.1 in /Users/ritikraj/CN-Project/config/dnsmasq/records.hosts...
+[Primary DNS] Dynamic reload triggered.
+[Backup DNS] Dynamic reload triggered.
+[DNS Admin] DNS record update complete.
+[Primary DNS] Stopping (PID 4447)...
+[Primary DNS] Stopped.
+[Backup DNS] Stopping (PID 4373)...
+[Backup DNS] Stopped.
+[Caching Resolver] Stopping (PID 4379)...
+[Caching Resolver] Stopped.
+[Primary DNS] Starting on 127.0.0.1:5355 (TTL=30)...
+[Primary DNS] Started successfully (PID 4521)
+[Backup DNS] Starting on 127.0.0.1:5354 (TTL=30)...
+[Backup DNS] Started successfully (PID 4528)
+[Caching Resolver] Starting on 127.0.0.1:5356...
+[Caching Resolver] Started successfully (PID 4534)
+
+--- Step 2: Starting TShark Packet Capture on Loopback ---
+
+--- Step 3: Authoritative Primary DNS Query (127.0.0.1:5355) ---
+[Timestamp: 20:10:15] Querying Authoritative Primary DNS:
+
+; <<>> DiG 9.10.6 <<>> @127.0.0.1 -p 5355 app.cnproject.test +noall +answer
+; (1 server found)
+;; global options: +cmd
+app.cnproject.test.	30	IN	A	127.0.0.1
+
+--- Step 4: Initial Query to Caching Resolver (127.0.0.1:5356) ---
+[Timestamp: 20:10:15] Query 1 to Caching Resolver (Populates Cache with TTL=30):
+
+; <<>> DiG 9.10.6 <<>> @127.0.0.1 -p 5356 app.cnproject.test +noall +answer
+; (1 server found)
+;; global options: +cmd
+app.cnproject.test.	28	IN	A	127.0.0.1
+
+--- Step 5: Second Query 5 Seconds Later (Observing TTL Countdown) ---
+[Timestamp: 20:10:20] Query 2 to Caching Resolver (Expected TTL ~25):
+
+; <<>> DiG 9.10.6 <<>> @127.0.0.1 -p 5356 app.cnproject.test +noall +answer
+; (1 server found)
+;; global options: +cmd
+app.cnproject.test.	23	IN	A	127.0.0.1
+
+--- Step 6: Controlled DNS Record Change (127.0.0.1 -> 127.0.0.2) ---
+[Timestamp: 20:10:20] Updating authoritative record to 127.0.0.2...
+[DNS Admin] Setting app.cnproject.test -> 127.0.0.2 in /Users/ritikraj/CN-Project/config/dnsmasq/records.hosts...
+[Primary DNS] Dynamic reload triggered.
+[Backup DNS] Dynamic reload triggered.
+[DNS Admin] DNS record update complete.
+Verifying Authoritative DNS updated immediately to 127.0.0.2:
+
+; <<>> DiG 9.10.6 <<>> @127.0.0.1 -p 5355 app.cnproject.test +noall +answer
+; (1 server found)
+;; global options: +cmd
+app.cnproject.test.	30	IN	A	127.0.0.2
+
+--- Step 7: Query Caching Resolver while Cache TTL Remains Valid ---
+[Timestamp: 20:10:21] Querying Caching Resolver (Demonstrating Stale Cache Retention):
+
+; <<>> DiG 9.10.6 <<>> @127.0.0.1 -p 5356 app.cnproject.test +noall +answer
+; (1 server found)
+;; global options: +cmd
+app.cnproject.test.	22	IN	A	127.0.0.1
+OBSERVATION: Authoritative returns 127.0.0.2, but Caching Resolver still serves cached 127.0.0.1!
+
+--- Step 8: Waiting for Cache TTL Expiration ---
+Current remaining TTL: 25s. Waiting 29s for cache to fully expire...
+
+--- Step 9: Query Caching Resolver After TTL Expiration ---
+[Timestamp: 20:10:50] Querying Caching Resolver after expiration:
+
+; <<>> DiG 9.10.6 <<>> @127.0.0.1 -p 5356 app.cnproject.test +noall +answer
+; (1 server found)
+;; global options: +cmd
+app.cnproject.test.	30	IN	A	127.0.0.2
+OBSERVATION: Cache expired! Resolver fetched new authoritative record 127.0.0.2 with fresh TTL=30.
+
+--- Step 10: Demonstrate Manual Cache Invalidation (Flush) ---
+[Timestamp: 20:10:50] Setting authoritative record back to 127.0.0.1...
+[DNS Admin] Setting app.cnproject.test -> 127.0.0.1 in /Users/ritikraj/CN-Project/config/dnsmasq/records.hosts...
+[Primary DNS] Dynamic reload triggered.
+[Backup DNS] Dynamic reload triggered.
+[DNS Admin] DNS record update complete.
+Query before flush (still cached as 127.0.0.2):
+
+; <<>> DiG 9.10.6 <<>> @127.0.0.1 -p 5356 app.cnproject.test +noall +answer
+; (1 server found)
+;; global options: +cmd
+app.cnproject.test.	30	IN	A	127.0.0.2
+Flushing Caching Resolver cache manually...
+[Caching Resolver] Flushing DNS cache (SIGHUP -> PID 4534)...
+[Caching Resolver] Cache flushed successfully.
+Query immediately after flush (Expected: immediate pickup of 127.0.0.1):
+
+; <<>> DiG 9.10.6 <<>> @127.0.0.1 -p 5356 app.cnproject.test +noall +answer
+; (1 server found)
+;; global options: +cmd
+app.cnproject.test.	30	IN	A	127.0.0.1
+
+--- Step 11: Inspect Captured DNS Packets ---
+    1   0.000000    127.0.0.1 → 127.0.0.1    LLMNR 79 Standard query 0x0101 A app.cnproject.test OPT
+    2   0.000702    127.0.0.1 → 127.0.0.1    LLMNR 95 Standard query response 0x0101 A app.cnproject.test A 127.0.0.1 OPT
+    3   0.012005    127.0.0.1 → 127.0.0.1    DNS 79 Standard query 0x4b12 A app.cnproject.test OPT
+    4   0.012577    127.0.0.1 → 127.0.0.1    DNS 95 Standard query response 0x4b12 A app.cnproject.test A 127.0.0.1 OPT
+    5   1.635630    127.0.0.1 → 127.0.0.1    LLMNR 79 Standard query 0xd064 A app.cnproject.test OPT
+    6   1.636131    127.0.0.1 → 127.0.0.1    LLMNR 95 Standard query response 0xd064 A app.cnproject.test A 127.0.0.1 OPT
+    7   1.697388    127.0.0.1 → 127.0.0.1    DNS 79 Standard query 0xeac9 A app.cnproject.test OPT
+    8   1.697879    127.0.0.1 → 127.0.0.1    DNS 95 Standard query response 0xeac9 A app.cnproject.test A 127.0.0.1 OPT
+    9   3.622646    127.0.0.1 → 127.0.0.1    LLMNR 79 Standard query 0xd916 A app.cnproject.test OPT
+   10   3.623249    127.0.0.1 → 127.0.0.1    LLMNR 95 Standard query response 0xd916 A app.cnproject.test A 127.0.0.1 OPT
+   11   3.679186    127.0.0.1 → 127.0.0.1    DNS 79 Standard query 0x68eb A app.cnproject.test OPT
+   12   3.679734    127.0.0.1 → 127.0.0.1    DNS 95 Standard query response 0x68eb A app.cnproject.test A 127.0.0.1 OPT
+   13   5.039745    127.0.0.1 → 127.0.0.1    DNS 79 Standard query 0x27e9 A app.cnproject.test OPT
+   14   5.040222    127.0.0.1 → 127.0.0.1    DNS 95 Standard query response 0x27e9 A app.cnproject.test A 127.0.0.1 OPT
+   15   5.598173    127.0.0.1 → 127.0.0.1    LLMNR 79 Standard query 0x9b89 A app.cnproject.test OPT
+   16   5.598880    127.0.0.1 → 127.0.0.1    LLMNR 95 Standard query response 0x9b89 A app.cnproject.test A 127.0.0.2 OPT
+   17   5.610991    127.0.0.1 → 127.0.0.1    DNS 79 Standard query 0x8009 A app.cnproject.test OPT
+   18   5.611446    127.0.0.1 → 127.0.0.1    DNS 95 Standard query response 0x8009 A app.cnproject.test A 127.0.0.1 OPT
+   19   5.618084    127.0.0.1 → 127.0.0.1    DNS 79 Standard query 0x7779 A app.cnproject.test OPT
+   20   5.618502    127.0.0.1 → 127.0.0.1    DNS 95 Standard query response 0x7779 A app.cnproject.test A 127.0.0.1 OPT
+   21   5.622529    127.0.0.1 → 127.0.0.1    LLMNR 79 Standard query 0xf302 A app.cnproject.test OPT
+   22   5.622960    127.0.0.1 → 127.0.0.1    LLMNR 95 Standard query response 0xf302 A app.cnproject.test A 127.0.0.2 OPT
+   23   5.680900    127.0.0.1 → 127.0.0.1    DNS 79 Standard query 0x8347 A app.cnproject.test OPT
+   24   5.681367    127.0.0.1 → 127.0.0.1    DNS 95 Standard query response 0x8347 A app.cnproject.test A 127.0.0.1 OPT
+   25   7.617297    127.0.0.1 → 127.0.0.1    LLMNR 79 Standard query 0x7128 A app.cnproject.test OPT
+
+--- Step 12: Clean Up and Restore Baseline Records ---
+[DNS Admin] Setting app.cnproject.test -> 127.0.0.1 in /Users/ritikraj/CN-Project/config/dnsmasq/records.hosts...
+[Primary DNS] Dynamic reload triggered.
+[Backup DNS] Dynamic reload triggered.
+[DNS Admin] DNS record update complete.
+[Cleanup] Baseline DNS records restored.
+
+============================================================
+STAGE 3 DEMONSTRATION COMPLETE - ALL OBJECTIVES VERIFIED
+Log saved to : /Users/ritikraj/CN-Project/evidence/phase-2/dns-ttl-test.txt
+PCAP saved to: /Users/ritikraj/CN-Project/evidence/phase-2/dns-ttl-capture.pcapng
+============================================================

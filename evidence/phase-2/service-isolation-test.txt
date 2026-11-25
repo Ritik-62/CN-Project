@@ -1,0 +1,70 @@
+============================================================
+EXTENSION C: SERVICE ISOLATION & BACKEND SECURITY TEST
+Date: Wed Nov 25 20:11:01 IST 2026
+Host: Ritiks-MacBook-Pro-3.local (arm64)
+============================================================
+
+--- Step 1: Starting Backends with Service Isolation Enforced (ENABLE_ISOLATION=1) ---
+[Backends] Stopping Backend A and Backend B...
+[Backend A] Stopped.
+[Backend B] Stopped.
+[Backends] Starting Backend A (:3001) with ENABLE_ISOLATION=1...
+[Backend A] Started (PID 4742)
+[Backends] Starting Backend B (:3002) with ENABLE_ISOLATION=1...
+[Backend B] Started (PID 4744)
+[Edge] Validating Main Edge config...
+[Edge] Starting Main Edge (:8443 SSL / :8080 HTTP)...
+[Main Edge] Already running (PID 98802)
+[Edge] Validating Standby Edge config...
+[Edge] Starting Standby Edge (:9443 SSL / :9080 HTTP)...
+[Standby Edge] Already running (PID 98809)
+
+--- Step 2 [Scenario A]: Direct Client Access to Backend A (:3001) ---
+Sending unauthenticated client request to http://127.0.0.1:3001/:
+Direct Access HTTP Status: 403
+SUCCESS: Direct client access to Backend A was BLOCKED (403 Forbidden) as required!
+HTTP/1.0 403 Forbidden
+Server: BaseHTTP/0.6 Python/3.11.7
+X-Isolation-Status: Blocked-Direct-Access-Denied
+{"error": "Access Denied: Direct backend access forbidden by Service Isolation Policy", "backend": "A", "isolation_status": "Blocked-Direct-Access-Denied"}
+
+--- Step 3 [Scenario B]: Direct Client Access to Backend B (:3002) ---
+Sending unauthenticated client request to http://127.0.0.1:3002/:
+Direct Access HTTP Status: 403
+SUCCESS: Direct client access to Backend B was BLOCKED (403 Forbidden) as required!
+HTTP/1.0 403 Forbidden
+Server: BaseHTTP/0.6 Python/3.11.7
+X-Isolation-Status: Blocked-Direct-Access-Denied
+{"error": "Access Denied: Direct backend access forbidden by Service Isolation Policy", "backend": "B", "isolation_status": "Blocked-Direct-Access-Denied"}
+
+--- Step 4 [Scenario C & E]: HTTPS Access Through Main Edge (Port 8443) ---
+Sending HTTPS request via Main Edge reverse proxy:
+HTTP/1.1 200 OK
+X-Backend: A
+X-Isolation-Status: Allowed-Edge-Authenticated
+X-Edge: Main
+SUCCESS: Main Edge successfully authenticated with backend and returned HTTP 200 OK!
+
+--- Step 5 [Scenario D & E]: HTTPS Access Through Standby Edge (Port 9443) ---
+Sending HTTPS request via Standby Edge reverse proxy:
+HTTP/1.1 200 OK
+X-Backend: B
+X-Isolation-Status: Allowed-Edge-Authenticated
+X-Edge: Standby
+SUCCESS: Standby Edge successfully authenticated with backend and returned HTTP 200 OK!
+
+--- Step 6: Verify Isolation Rollback / Permissive Compatibility ---
+Restarting Backends in default Permissive mode (ENABLE_ISOLATION=0)...
+[Backends] Stopping Backend A and Backend B...
+[Backend A] Stopped.
+[Backend B] Stopped.
+[Backends] Starting Backend A (:3001) with ENABLE_ISOLATION=0...
+[Backend A] Started (PID 4797)
+[Backends] Starting Backend B (:3002) with ENABLE_ISOLATION=0...
+[Backend B] Started (PID 4799)
+Direct Access in Permissive Mode HTTP Status: 200
+
+============================================================
+EXTENSION C: SERVICE ISOLATION TEST PASSED ALL 5 SCENARIOS
+Evidence written to: /Users/ritikraj/CN-Project/evidence/phase-2/service-isolation-test.txt
+============================================================

@@ -1,0 +1,130 @@
+========================================================
+STAGE 2: BACKUP DNS RESOLVER & FAILOVER AUTOMATED TEST
+Date: Wed Nov 25 20:10:03 IST 2026
+Host: Ritiks-MacBook-Pro-3.local (arm64)
+========================================================
+
+--- Step 1: Starting Both Primary and Backup DNS Services ---
+[Primary DNS] Stopping (PID 99848)...
+[Primary DNS] Stopped.
+[Backup DNS] Stopping (PID 99854)...
+[Backup DNS] Stopped.
+[Caching Resolver] Stopping (PID 99860)...
+[Caching Resolver] Stopped.
+[Primary DNS] Starting on 127.0.0.1:5355 (TTL=30)...
+[Primary DNS] Started successfully (PID 4362)
+[Backup DNS] Starting on 127.0.0.1:5354 (TTL=30)...
+[Backup DNS] Started successfully (PID 4373)
+[Caching Resolver] Starting on 127.0.0.1:5356...
+[Caching Resolver] Started successfully (PID 4379)
+=== DNS SERVICES STATUS ===
+Primary DNS      (127.0.0.1:5355): RUNNING (PID 4362)
+Backup DNS       (127.0.0.1:5354): RUNNING (PID 4373)
+Caching Resolver (127.0.0.1:5356): RUNNING (PID 4379)
+Current records in /Users/ritikraj/CN-Project/config/dnsmasq/records.hosts:
+  127.0.0.1 app.cnproject.test
+  127.0.0.1 api.cnproject.test
+
+--- Step 2: Query Primary DNS Directly (dig @127.0.0.1 -p 5355) ---
+
+; <<>> DiG 9.10.6 <<>> @127.0.0.1 -p 5355 app.cnproject.test +noall +answer +comments
+; (1 server found)
+;; global options: +cmd
+;; Got answer:
+;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 55625
+;; flags: qr aa rd ra; QUERY: 1, ANSWER: 1, AUTHORITY: 0, ADDITIONAL: 1
+
+;; OPT PSEUDOSECTION:
+; EDNS: version: 0, flags:; udp: 1232
+;; ANSWER SECTION:
+app.cnproject.test.	30	IN	A	127.0.0.1
+
+
+; <<>> DiG 9.10.6 <<>> @127.0.0.1 -p 5355 api.cnproject.test +noall +answer
+; (1 server found)
+;; global options: +cmd
+api.cnproject.test.	30	IN	A	127.0.0.1
+
+--- Step 3: Query Backup DNS Directly (dig @127.0.0.1 -p 5354) ---
+
+; <<>> DiG 9.10.6 <<>> @127.0.0.1 -p 5354 app.cnproject.test +noall +answer +comments
+; (1 server found)
+;; global options: +cmd
+;; Got answer:
+;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 15760
+;; flags: qr aa rd ra; QUERY: 1, ANSWER: 1, AUTHORITY: 0, ADDITIONAL: 1
+
+;; OPT PSEUDOSECTION:
+; EDNS: version: 0, flags:; udp: 1232
+;; ANSWER SECTION:
+app.cnproject.test.	30	IN	A	127.0.0.1
+
+
+; <<>> DiG 9.10.6 <<>> @127.0.0.1 -p 5354 api.cnproject.test +noall +answer
+; (1 server found)
+;; global options: +cmd
+api.cnproject.test.	30	IN	A	127.0.0.1
+
+--- Step 4: Client Resolver Baseline Query (Primary Active) ---
+==================================================
+Resolving: app.cnproject.test (A)
+Configured Primary DNS: 127.0.0.1:5355
+Configured Backup DNS : 127.0.0.1:5354
+==================================================
+[DNS Client] SUCCESS: Answered by Primary DNS (127.0.0.1:5355)
+[DNS Client] Answer: 127.0.0.1
+
+--- Step 5: Inject Primary DNS Failure (Stopping Primary DNS) ---
+[Primary DNS] Stopping (PID 4362)...
+[Primary DNS] Stopped.
+=== DNS SERVICES STATUS ===
+Primary DNS      (127.0.0.1:5355): STOPPED
+Backup DNS       (127.0.0.1:5354): RUNNING (PID 4373)
+Caching Resolver (127.0.0.1:5356): RUNNING (PID 4379)
+Current records in /Users/ritikraj/CN-Project/config/dnsmasq/records.hosts:
+  127.0.0.1 app.cnproject.test
+  127.0.0.1 api.cnproject.test
+
+--- Step 6: Verify Primary DNS Is Unreachable ---
+CONFIRMED: Primary DNS is offline (connection timed out).
+
+--- Step 7: Client Resolver During Primary Failure (Backup Failover Verification) ---
+==================================================
+Resolving: app.cnproject.test (A)
+Configured Primary DNS: 127.0.0.1:5355
+Configured Backup DNS : 127.0.0.1:5354
+==================================================
+[DNS Client] WARNING: Primary DNS (127.0.0.1:5355) unreachable or returned empty.
+[DNS Client] INITIATING FAILOVER -> Querying Backup DNS (127.0.0.1:5354)...
+[DNS Client] FAILOVER SUCCESS: Answered by Backup DNS (127.0.0.1:5354)
+[DNS Client] Answer: 127.0.0.1
+
+--- Step 8: Restore Primary DNS Service ---
+[Primary DNS] Starting on 127.0.0.1:5355 (TTL=30)...
+[Primary DNS] Started successfully (PID 4447)
+=== DNS SERVICES STATUS ===
+Primary DNS      (127.0.0.1:5355): RUNNING (PID 4447)
+Backup DNS       (127.0.0.1:5354): RUNNING (PID 4373)
+Caching Resolver (127.0.0.1:5356): RUNNING (PID 4379)
+Current records in /Users/ritikraj/CN-Project/config/dnsmasq/records.hosts:
+  127.0.0.1 app.cnproject.test
+  127.0.0.1 api.cnproject.test
+
+--- Step 9: Verify Both DNS Instances Respond After Recovery ---
+[Primary DNS Query]:
+127.0.0.1
+[Backup DNS Query]:
+127.0.0.1
+[Client Resolver Query]:
+==================================================
+Resolving: app.cnproject.test (A)
+Configured Primary DNS: 127.0.0.1:5355
+Configured Backup DNS : 127.0.0.1:5354
+==================================================
+[DNS Client] SUCCESS: Answered by Primary DNS (127.0.0.1:5355)
+[DNS Client] Answer: 127.0.0.1
+
+========================================================
+STAGE 2 TEST COMPLETED SUCCESSFULLY WITH ALL CHECKS PASS
+Evidence written to: /Users/ritikraj/CN-Project/evidence/phase-2/backup-dns-failover-test.txt
+========================================================

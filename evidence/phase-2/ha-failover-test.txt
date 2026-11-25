@@ -1,0 +1,73 @@
+============================================================
+EXTENSION D: HIGH AVAILABILITY & FAILOVER AUTOMATED TEST
+Date: Wed Nov 25 20:11:03 IST 2026
+Host: Ritiks-MacBook-Pro-3.local (arm64)
+============================================================
+
+--- Ensuring baseline services running ---
+
+--- CASE 1: Both Backends Healthy (Load Balancing Distribution) ---
+Request 1 -> Served by Backend B
+Request 2 -> Served by Backend A
+Request 3 -> Served by Backend B
+Request 4 -> Served by Backend A
+Request 5 -> Served by Backend B
+Request 6 -> Served by Backend A
+Request 7 -> Served by Backend B
+Request 8 -> Served by Backend A
+Distribution: Backend A = 4 requests, Backend B = 4 requests.
+CASE 1 PASS: Traffic actively distributed across both healthy backends.
+
+--- CASE 2: Backend A Stops (Zero Dropped Requests Failover to B) ---
+Stopping Backend A...
+Request 1 -> Seamlessly handled by Backend B (200 OK)
+Request 2 -> Seamlessly handled by Backend B (200 OK)
+Request 3 -> Seamlessly handled by Backend B (200 OK)
+Request 4 -> Seamlessly handled by Backend B (200 OK)
+Request 5 -> Seamlessly handled by Backend B (200 OK)
+Failover Result: Successful = 5 / 5, Failed = 0 / 5.
+CASE 2 PASS: 100% of requests successfully routed to Backend B with zero client errors!
+
+--- CASE 3: Backend A Restarts (Load Balancing Restoration) ---
+Restarting Backend A...
+Waiting 6s for nginx fail_timeout (5s) window to expire...
+Request 1 -> Served by Backend B
+Request 2 -> Served by Backend B
+Request 3 -> Served by Backend A
+Request 4 -> Served by Backend B
+Request 5 -> Served by Backend A
+Request 6 -> Served by Backend B
+Request 7 -> Served by Backend A
+Request 8 -> Served by Backend B
+Restoration Result: Backend A = 3, Backend B = 5.
+CASE 3 PASS: Backend A rejoined the upstream pool and load balancing resumed.
+
+--- CASE 4: Backend B Stops (Failover to Backend A) ---
+Stopping Backend B...
+Request 1 -> Seamlessly handled by Backend A (200 OK)
+Request 2 -> Seamlessly handled by Backend A (200 OK)
+Request 3 -> Seamlessly handled by Backend A (200 OK)
+Request 4 -> Seamlessly handled by Backend A (200 OK)
+Request 5 -> Seamlessly handled by Backend A (200 OK)
+CASE 4 PASS: 100% of requests successfully routed to Backend A.
+
+--- CASE 5: Both Backends Stop (Controlled 502 Bad Gateway) ---
+Stopping Backend A as well...
+/Users/ritikraj/CN-Project/scripts/test_ha_failover.sh: line 119:  4952 Terminated: 15          ENABLE_ISOLATION=0 python3 -u "$PROJECT_ROOT/backends/backend-a/server.py" > /tmp/backend-a.log 2>&1
+HTTP Status when all backends are down: 502
+CASE 5 PASS: Controlled HTTP 502 Bad Gateway returned by nginx edge!
+
+--- CASE 6: Backends Recover ---
+Restarting both backends...
+[Backends] Starting Backend A (:3001) with ENABLE_ISOLATION=0...
+[Backend A] Started (PID 5051)
+[Backends] Starting Backend B (:3002) with ENABLE_ISOLATION=0...
+[Backend B] Started (PID 5053)
+Waiting 6s for fail_timeout to expire...
+HTTP Status after recovery: 200
+CASE 6 PASS: Normal application service auto-resumed without rebuilding infrastructure.
+
+============================================================
+EXTENSION D: HIGH AVAILABILITY TEST COMPLETED WITH ALL PASS
+Evidence written to: /Users/ritikraj/CN-Project/evidence/phase-2/ha-failover-test.txt
+============================================================

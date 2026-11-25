@@ -1,0 +1,35 @@
+============================================================
+CN-PROJECT: LAYER-BY-LAYER DIAGNOSTIC SCAN
+Timestamp: 2026-11-25 20:11:27
+Host: Ritiks-MacBook-Pro-3.local (arm64) | OS: Darwin 24.6.0
+============================================================
+
+=== LAYER 1-3: PHYSICAL, DATA-LINK & NETWORK LAYER ===
+  [PASS] Loopback interface (lo0) is UP and has 127.0.0.1 assigned
+
+=== LAYER 4: TRANSPORT LAYER (PORT & SOCKET AVAILABILITY) ===
+  [PASS] Primary DNS listening on TCP port 5355
+  [PASS] Backup DNS listening on TCP port 5354
+  [PASS] Caching Resolver listening on TCP port 5356
+  [PASS] Main Edge nginx (HTTPS) listening on TCP port 8443
+  [PASS] Standby Edge nginx (HTTPS) listening on TCP port 9443
+  [PASS] Backend A listening on TCP port 3001
+  [PASS] Backend B listening on TCP port 3002
+
+=== LAYER 5-6: SESSION & PRESENTATION LAYER (TLS & CERTIFICATES) ===
+  [PASS] Server certificate present (/Users/ritikraj/CN-Project/config/nginx/certs/app.cnproject.test.crt)
+  [PASS] Certificate Expiration: Oct  5 13:41:39 2027 GMT
+  [PASS] SAN validation: DNS:app.cnproject.test present
+  [PASS] TLS Handshake to Main Edge (8443): SUCCESS (Verify return code: 0 ok)
+
+=== LAYER 7: APPLICATION LAYER (DNS, HTTP & PROXY HEALTH) ===
+  [PASS] Primary DNS resolves app.cnproject.test -> 127.0.0.1
+  [PASS] Backup DNS resolves app.cnproject.test -> 127.0.0.1
+  [PASS] Main Edge HTTPS (8443): HTTP 200 OK (X-Edge: Main | X-Backend: A)
+  [PASS] Standby Edge HTTPS (9443): HTTP 200 OK (X-Edge: Standby | X-Backend: B)
+
+============================================================
+DIAGNOSTIC SUMMARY & ROOT-CAUSE ANALYSIS
+============================================================
+STATUS: ALL SYSTEMS HEALTHY. No network faults detected across Layers 1-7.
+============================================================
